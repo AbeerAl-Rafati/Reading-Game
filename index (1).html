@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>رحلة القراءة</title>
+<link href="https://fonts.googleapis.com/css2?family=Lalezar&family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e4eeec;--card:#f7fbfa;--ink:#14383f;--mut:#5d7a7f;--acc:#e8a23a;--accInk:#3a2600;--line:#c5d8d5;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f2226;--card:#16323a;--ink:#e3f0ee;--mut:#8fb0b4;--acc:#f0b04c;--line:#25474f}}
+:root[data-theme="dark"]{--bg:#0f2226;--card:#16323a;--ink:#e3f0ee;--mut:#8fb0b4;--acc:#f0b04c;--line:#25474f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Tajawal,Tahoma,sans-serif;line-height:1.7;min-height:100vh}
+#app{max-width:460px;margin:0 auto;padding:22px 18px 40px}
+h1,h2{font-family:Lalezar,Tajawal,sans-serif;font-weight:400;margin:0}
+h1{font-size:2.6rem;line-height:1.1}
+h2{font-size:1.7rem}
+h3{margin:22px 0 4px;font-size:1.05rem}
+p{margin:6px 0}
+.mut{color:var(--mut)}
+label{display:block;margin:16px 0 4px;font-weight:700}
+input,select{width:100%;font:inherit;color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:12px;padding:10px 12px}
+input:focus,select:focus,button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+button{font:700 1.1rem Tajawal,sans-serif;background:var(--acc);color:var(--accInk);border:0;border-radius:12px;padding:12px 22px;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+.big{width:100%;margin-top:22px;padding:15px}
+.row{display:flex;gap:10px;margin-top:14px}.row button{flex:1}
+.top{display:flex;justify-content:space-between;color:var(--mut);font-weight:700}
+.tree{font-size:4.2rem;text-align:center;margin-top:14px;line-height:1}
+.time{font-family:Lalezar,Tajawal,sans-serif;font-size:5.6rem;text-align:center;line-height:1.1;direction:ltr}
+.bar{height:10px;background:var(--line);border-radius:9px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--acc)}
+.trail{display:flex;justify-content:space-between;margin:18px 0 6px}
+.nd{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-weight:700;font-size:.9rem;color:var(--mut)}
+.nd.done{background:var(--acc);border-color:var(--acc);color:var(--accInk)}
+.nd.cur{border-color:var(--acc);color:var(--ink);box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 30%,transparent)}
+.pk{display:flex;gap:8px}.pk button{padding:10px 16px}
+ul{list-style:none;padding:0;margin:10px 0 0}
+li{background:var(--card);border:2px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:center}
+li input{width:20px;height:20px;accent-color:var(--acc)}
+li.d span{text-decoration:line-through;color:var(--mut)}
+.msg{min-height:1.7em;color:var(--mut);margin-top:12px;text-align:center}
+.st{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.st div{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:12px;text-align:center}
+.st b{display:block;font-family:Lalezar,Tajawal,sans-serif;font-size:2rem;font-weight:400;line-height:1.2}
+@media (prefers-reduced-motion:no-preference){.nd.cur{animation:pl 1.8s ease-in-out infinite}@keyframes pl{50%{transform:scale(1.12)}}}
+.ch{display:flex;gap:4px;align-items:flex-end;height:110px;direction:ltr}
+.ch div{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+.ch i{display:block;width:100%;background:var(--acc);border-radius:4px 4px 0 0;min-height:2px}
+.ch small{font-size:.7rem;color:var(--mut)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+const $=i=>document.getElementById(i),app=$('app');
+let S=null,H={log:[]};
+/* طبقة التخزين: لما تضيفي قاعدة بيانات (Supabase مثلًا) بتغيّري load و save بس */
+const DB={load(){try{const d=JSON.parse(localStorage.getItem('rr')||'{}');return Array.isArray(d.log)?d:{log:[]}}catch(e){return{log:[]}}},save(){try{localStorage.setItem('rr',JSON.stringify(H))}catch(e){}}};
+H=DB.load();
+/* ربط Supabase: المفتاح العام (anon) مسموح يكون بالكود، والحماية من سياسة RLS */
+const SB_URL='https://ivzhcfbvyrzikkptavus.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2emhjZmJ2eXJ6aWtrcHRhdnVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNTkzMjQsImV4cCI6MjEwNjgzNTMyNH0.V6JRJ0brlF4voAS6fxrj07pKQeEWth5XF5DhiFNQdCo';
+let sb=null,U=null;
+try{sb=window.supabase.createClient(SB_URL,SB_KEY)}catch(e){}
+async function push(rows){if(!sb||!U||!rows.length)return;try{await sb.from('sessions').upsert(rows.map(r=>({id:r.id,t:r.t,book:r.book,mins:r.mins,pages:r.pages,dis:r.dis,pk:r.pk,stages:r.stages,user_id:U.id})),{onConflict:'user_id,id'})}catch(e){}}
+async function pull(){if(!sb||!U)return;try{const{data,error}=await sb.from('sessions').select('id,t,book,mins,pages,dis,pk,stages');if(error)throw error;const ids=new Set(data.map(x=>x.id));data.forEach(x=>{const i=H.log.findIndex(y=>y.id===x.id);if(i<0)H.log.push(x);else H.log[i]=x});DB.save();await push(H.log.filter(x=>!ids.has(x.id)))}catch(e){}}
+function saveSess(){if(!S)return;const r={id:S.id,t:S.id,book:S.book,mins:S.mins,pages:S.pages,dis:S.dis,pk:S.pk,stages:S.done};const i=H.log.findIndex(x=>x.id===S.id);if(i<0)H.log.push(r);else H.log[i]=r;DB.save();push([r])}
+const pad=n=>String(n).padStart(2,'0');
+const fmt=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return pad(Math.floor(s/60))+':'+pad(s%60)};
+const cheer=['عادي، الشرود بصير. رجعتي، وهاد المهم.','كمّلي من آخر سطر، ولا تبدّي من الأول.','دقيقة وحدة بس وبترجع التركيز.','سجّلي اللي شغل بالك بالجيب وكمّلي.','شاطرة، لاحظتي حالك وهاد نص الشغل.'];
+const trees=['🌱','🌿','🪴','🌳','🌳'];
+function beep(){try{const a=new(window.AudioContext||window.webkitAudioContext)();[0,.25,.5].forEach((d,i)=>{const o=a.createOscillator(),g=a.createGain();o.frequency.value=660+i*110;g.gain.value=.15;o.connect(g);g.connect(a.destination);o.start(a.currentTime+d);o.stop(a.currentTime+d+.18)})}catch(e){}}
+
+function setup(){
+ S=null;document.title='رحلة القراءة';
+ app.innerHTML=`<h1>رحلة القراءة</h1>
+ <p class="mut">قسّمي القراءة لمراحل قصيرة. بين كل مرحلة استراحة محترمة، وأي شي بدك تدوري عليه بتسجليه وبتدوري عليه بالاستراحة.</p>
+ <label for="book">شو الكتاب؟</label><input id="book" placeholder="اسم الكتاب">
+ <label for="n">كم مرحلة؟</label>
+ <select id="n"><option>3</option><option>4</option><option selected>6</option><option>8</option></select>
+ <label for="m">كم دقيقة بالمرحلة؟</label>
+ <select id="m"><option>20</option><option selected>25</option><option>30</option><option>40</option></select>
+ <p class="mut" id="tot"></p>
+ <button class="big" id="st">يلا نبلّش الرحلة</button>
+ <button class="ghost big" id="sb" style="margin-top:10px">إحصائياتي</button>`;
+ const calc=()=>{const n=+$('n').value,m=+$('m').value,t=n*m+(n-1)*5;$('tot').textContent='المجموع تقريبًا: '+Math.floor(t/60)+' ساعة و'+t%60+' دقيقة، مع الاستراحات.'};
+ $('n').onchange=$('m').onchange=calc;calc();
+ $('sb').onclick=stats;
+ if(sb){const b=document.createElement('button');b.className='ghost big';b.style.marginTop='10px';
+  if(U){b.textContent='تسجيل خروج ('+U.email+')';b.onclick=async()=>{try{await sb.auth.signOut()}catch(e){}U=null;try{localStorage.removeItem('rr_guest')}catch(e){}H={log:[]};DB.save();login()}}
+  else{b.textContent='سجّلي دخول لحفظ بياناتك على الكلاود';b.onclick=()=>login()}
+  app.append(b)}
+ $('st').onclick=()=>{
+  S={book:$('book').value.trim()||'كتابي',n:+$('n').value,m:+$('m').value,b:5,cur:1,pocket:[],pk:0,pages:0,dis:0,mins:0,id:Date.now(),done:0};
+  try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}
+  go('read')};
+}
+function go(ph){
+ S.ph=ph;S.fired=0;S.paused=0;
+ if(ph==='read')S.end=Date.now()+S.m*60000;
+ if(ph==='break')S.end=Date.now()+S.b*60000;
+ render();
+}
+function trail(){let h='<div class="trail">';for(let i=1;i<=S.n;i++){const d=i<S.cur||(S.ph!=='read'&&i===S.cur),c=S.ph==='read'&&i===S.cur;h+=`<div class="nd ${d?'done':c?'cur':''}">${d?'✓':i}</div>`}return h+'</div>'}
+function drawList(el,edit){
+ el.innerHTML='';
+ S.pocket.forEach((it,i)=>{const li=document.createElement('li'),sp=document.createElement('span');sp.textContent=it.t;
+  if(edit){const cb=document.createElement('input');cb.type='checkbox';cb.checked=it.d;cb.onchange=()=>{it.d=cb.checked;li.className=it.d?'d':''};li.className=it.d?'d':'';li.append(cb)}
+  li.append(sp);el.append(li)});
+}
+function render(){
+ const done=S.cur-1+(S.ph==='read'?0:1);
+ const tree=trees[Math.min(4,Math.floor(done/S.n*4))];
+ if(S.ph==='read'){
+  app.innerHTML=`<div class="top"><span>${''}</span><span id="bk"></span><span>مرحلة ${S.cur} من ${S.n}</span></div>
+  <div class="tree">${tree}</div><div class="time" id="tm">${fmt(S.m*60000)}</div>
+  <div class="bar"><i id="bf"></i></div>${trail()}
+  <h3>جيب الفضول</h3><p class="mut">خطر ببالك شي بدك تدوري عليه؟ اكتبيه هون وكمّلي قراءة. بتدوري عليه بالاستراحة.</p>
+  <div class="pk"><input id="pi" placeholder="مثلًا: مين كان هالشخص؟"><button id="pa">سجّلي</button></div>
+  <ul id="pl"></ul>
+  <div class="row"><button class="ghost" id="pz">وقفة</button><button class="ghost" id="ds">شردت</button></div>
+  <p class="msg" id="ms"></p>`;
+  $('bk').textContent=S.book;drawList($('pl'),false);
+  const add=()=>{const v=$('pi').value.trim();if(!v)return;S.pocket.push({t:v,d:false});S.pk++;$('pi').value='';drawList($('pl'),false);$('pi').focus()};
+  $('pa').onclick=add;$('pi').onkeydown=e=>{if(e.key==='Enter')add()};
+  $('ds').onclick=()=>{S.dis++;$('ms').textContent=cheer[Math.floor(Math.random()*cheer.length)]};
+  $('pz').onclick=()=>{if(S.paused){S.end=Date.now()+S.rem;S.paused=0;$('pz').textContent='وقفة'}else{S.rem=S.end-Date.now();S.paused=1;$('pz').textContent='كمّلي'}};
+ }else{
+  const last=S.ph==='last';
+  app.innerHTML=`<div class="tree">${last?'🌳':'☕'}</div>
+  <h2 style="text-align:center">${last?'خلصتي الرحلة!':'استراحة'}</h2>
+  ${last?'':`<div class="time" id="tm">${fmt(S.b*60000)}</div><div class="bar"><i id="bf"></i></div><p class="mut" style="text-align:center">قومي، مدّي جسمك، اشربي ماي.</p>`}
+  <h3>وقت الفضول</h3><p class="mut" id="pe"></p><ul id="pl"></ul>
+  <label for="pg">كم صفحة قريتي بهالمرحلة؟</label><input id="pg" type="number" min="0" inputmode="numeric" placeholder="0">
+  <button class="big" id="nx">${last?'شوفي نتيجتك':'خلصت الاستراحة، يلا نكمّل'}</button>`;
+  $('pe').textContent=S.pocket.length?'دوري على هالأشياء هلأ، ورتّبي اللي خلصتيه:':'ما سجلتي شي هالمرة. قراءة صافية!';
+  drawList($('pl'),true);
+  $('nx').onclick=()=>{S.pages+=+$('pg').value||0;saveSess();S.pocket=S.pocket.filter(x=>!x.d);if(last)finish();else{S.cur++;go('read')}};
+ }
+ tick();
+}
+function tick(){
+ if(!S||S.ph==='done'||S.ph==='last'||S.paused)return;
+ const rem=S.end-Date.now(),tm=$('tm');
+ if(tm)tm.textContent=fmt(rem);
+ const bf=$('bf');if(bf){const tot=(S.ph==='read'?S.m:S.b)*60000;bf.style.width=Math.min(100,(1-rem/tot)*100)+'%'}
+ document.title=fmt(rem)+' | '+(S.ph==='read'?'اقرأي':'استراحة');
+ if(rem<=0&&!S.fired){S.fired=1;beep();
+  if(S.ph==='read'){S.mins+=S.m;S.done++;saveSess();go(S.cur===S.n?'last':'break')}
+  else if($('nx'))$('nx').textContent='خلصت الاستراحة، يلا نكمّل'}
+}
+function finish(){
+ S.ph='done';saveSess();
+ document.title='خلصتي!';
+ app.innerHTML=`<div class="tree">🌳</div><h2 style="text-align:center">رحلة كاملة!</h2>
+ <p class="mut" style="text-align:center" id="sm"></p>
+ <div class="st"><div><b>${S.mins}</b>دقيقة قراءة</div><div><b>${S.pages}</b>صفحة</div><div><b>${S.pk}</b>فضول سجلتيه</div><div><b>${S.dis}</b>مرة شردتي ورجعتي</div></div>
+ <button class="big" id="again">رحلة جديدة</button>`;
+ $('sm').textContent='خلصتي "'+S.book+'" لهالجلسة. كل فضول سجلتيه كان وقفة أقل بالقراءة.';
+ $('again').onclick=setup;
+}
+function dk(t){const d=new Date(t);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function ago(i){const d=new Date();d.setHours(12);d.setDate(d.getDate()-i);return d}
+function dl(n,t,ty){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:ty}));a.download=n;a.click()}
+function stats(){
+ S=null;document.title='إحصائياتي';
+ const L=H.log,sum=k=>L.reduce((a,x)=>a+(x[k]||0),0),by={};
+ L.forEach(x=>{const k=dk(x.t);by[k]=by[k]||{m:0,p:0};by[k].m+=x.mins;by[k].p+=x.pages});
+ const val=(i,k)=>(by[dk(ago(i))]||{})[k]||0;
+ const days=[];for(let i=13;i>=0;i--)days.push({i,n:ago(i).getDate()});
+ const mins=sum('mins'),pages=sum('pages'),act=Object.keys(by).filter(k=>by[k].m>0).length;
+ let streak=0;for(let i=0;i<400;i++){if(val(i,'m')>0)streak++;else if(i>0)break}
+ const wk=(a,b)=>{let t=0;for(let i=a;i<b;i++)t+=val(i,'m');return t};
+ const w1=wk(0,7),w0=wk(7,14);
+ const trend=!w1&&!w0?'':!w0?'هاد أسبوعك الأول، بداية حلوة.':w1>=w0?'قريتي أكتر بـ'+Math.round((w1-w0)/w0*100)+'% من الأسبوع اللي قبله.':'قريتي أقل بـ'+Math.round((w0-w1)/w0*100)+'% من الأسبوع اللي قبله. عادي، ارجعي بالتدريج.';
+ const chart=(t,k)=>{const mx=Math.max(1,...days.map(d=>val(d.i,k)));return `<h3>${t}</h3><div class="ch">${days.map(d=>`<div><i style="height:${val(d.i,k)/mx*100}%"></i><small>${d.n}</small></div>`).join('')}</div>`};
+ const hrs=mins/60,best=Math.max(0,...Object.values(by).map(v=>v.m));
+ app.innerHTML=`<h2>إحصائياتي</h2>`+(L.length?`<p class="mut">${trend}</p>
+ <div class="st"><div><b>${L.length}</b>جلسة</div><div><b>${(hrs).toFixed(1)}</b>ساعة قراءة</div><div><b>${pages}</b>صفحة</div><div><b>${streak}</b>يوم متتالي</div>
+ <div><b>${act?Math.round(mins/act):0}</b>دقيقة بمتوسط اليوم</div><div><b>${hrs?(pages/hrs).toFixed(1):0}</b>صفحة بالساعة</div>
+ <div><b>${hrs?(sum('dis')/hrs).toFixed(1):0}</b>شرده بالساعة</div><div><b>${best}</b>أطول يوم بالدقايق</div></div>
+ ${chart('دقايق القراءة، آخر 14 يوم','m')}${chart('الصفحات، آخر 14 يوم','p')}`:`<p class="mut">ما في بيانات لسا. خلصي مرحلة قراءة وحدة وبتظهر هون.</p>`)+`
+ <h3>بياناتك</h3><div class="row"><button class="ghost" id="ec">تصدير CSV</button><button class="ghost" id="ej">نسخة احتياطية</button></div>
+ <div class="row"><button class="ghost" id="im">استيراد نسخة</button></div><input type="file" id="fi" accept=".json" hidden>
+ <p class="msg" id="ms"></p><button class="big" id="bk">رجوع</button>`;
+ $('bk').onclick=setup;
+ $('ec').onclick=()=>dl('reading.csv','\uFEFFdate,book,minutes,pages,distractions,curiosities,stages\n'+L.map(x=>[dk(x.t),'"'+String(x.book).replace(/"/g,'""')+'"',x.mins,x.pages,x.dis,x.pk,x.stages].join(',')).join('\n'),'text/csv');
+ $('ej').onclick=()=>dl('reading-backup.json',JSON.stringify(H),'application/json');
+ $('im').onclick=()=>$('fi').click();
+ $('fi').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.log))throw 0;d.log.forEach(x=>{if(!H.log.some(y=>y.id===x.id))H.log.push(x)});DB.save();stats()}catch(err){$('ms').textContent='الملف مش صالح.'}};r.readAsText(f)};
+}
+function login(){
+ S=null;document.title='رحلة القراءة';
+ app.innerHTML=`<h1>رحلة القراءة</h1><p class="mut">سجّلي دخول عشان بياناتك تنحفظ على الكلاود وتشوفيها من أي جهاز.</p>
+ <label for="em">الإيميل</label><input id="em" type="email" autocomplete="email" dir="ltr">
+ <label for="pw">كلمة السر</label><input id="pw" type="password" autocomplete="current-password" dir="ltr">
+ <div class="row"><button id="li">دخول</button><button class="ghost" id="su">حساب جديد</button></div>
+ <p class="msg" id="ms"></p><button class="ghost big" id="gs">كمّلي بدون حساب</button>`;
+ const say=t=>$('ms').textContent=t;
+ const cred=()=>{const e=$('em').value.trim(),p=$('pw').value;if(!e||p.length<6){say('اكتبي إيميل وكلمة سر من 6 أحرف على الأقل.');return null}return{email:e,password:p}};
+ const done=async u=>{U=u;say('لحظة، عم نجيب بياناتك...');await pull();setup()};
+ $('li').onclick=async()=>{const c=cred();if(!c)return;say('لحظة...');
+  try{const{data,error}=await sb.auth.signInWithPassword(c);
+   if(error)return say(/confirm/i.test(error.message)?'لازم تأكدي الإيميل أول، شوفي بريدك.':/invalid/i.test(error.message)?'الإيميل أو كلمة السر غلط.':'صار خطأ: '+error.message);
+   done(data.user)}catch(e){say('ما في اتصال بالإنترنت.')}};
+ $('su').onclick=async()=>{const c=cred();if(!c)return;say('لحظة...');
+  try{const{data,error}=await sb.auth.signUp(c);
+   if(error)return say('صار خطأ: '+error.message);
+   if(data.session)done(data.user);else say('بعتنالك رسالة تأكيد على الإيميل. أكّديها وبعدين دوسي دخول.')}catch(e){say('ما في اتصال بالإنترنت.')}};
+ $('gs').onclick=()=>{try{localStorage.setItem('rr_guest','1')}catch(e){}setup()};
+}
+setInterval(tick,500);
+(async()=>{
+ if(!sb){setup();return}
+ try{const{data}=await sb.auth.getSession();U=data.session?data.session.user:null}catch(e){}
+ let g=0;try{g=localStorage.getItem('rr_guest')}catch(e){}
+ if(U){await pull();setup()}else if(g)setup();else login();
+})();
+</script>
+</body>
+</html>

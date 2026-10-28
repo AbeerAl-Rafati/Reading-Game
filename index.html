@@ -68,7 +68,7 @@ let S=null,OS=[],view='home',H={log:[]};
 /* طبقة التخزين: لما تضيفي قاعدة بيانات (Supabase مثلًا) بتغيّري load و save بس */
 const DB={load(){try{const d=JSON.parse(localStorage.getItem('rr')||'{}');return Array.isArray(d.log)?d:{log:[]}}catch(e){return{log:[]}}},save(){try{localStorage.setItem('rr',JSON.stringify(H))}catch(e){}}};
 H=DB.load();
-H.pd=H.pd||{};H.books=H.books||[];
+H.pd=H.pd||{};H.books=H.books||[];H.notes=H.notes||[];
 const GOAL={base:1000,step:50,start:'2026-10'};/* هدف الشهر الأول، والزيادة كل شهر، وأول شهر */
 /* ربط Supabase: المفتاح العام (anon) مسموح يكون بالكود، والحماية من سياسة RLS */
 const SB_URL='https://ivzhcfbvyrzikkptavus.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2emhjZmJ2eXJ6aWtrcHRhdnVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNTkzMjQsImV4cCI6MjEwNjgzNTMyNH0.V6JRJ0brlF4voAS6fxrj07pKQeEWth5XF5DhiFNQdCo';
@@ -77,10 +77,15 @@ try{sb=window.supabase.createClient(SB_URL,SB_KEY)}catch(e){}
 async function push(rows){if(!sb||!U||!rows.length)return;try{await sb.from('sessions').upsert(rows.map(r=>({id:r.id,t:r.t,book:r.book,mins:r.mins,pages:r.pages,dis:r.dis,pk:r.pk,stages:r.stages,user_id:U.id})),{onConflict:'user_id,id'})}catch(e){}}
 async function pull(){if(!sb||!U)return;try{const{data,error}=await sb.from('sessions').select('id,t,book,mins,pages,dis,pk,stages');if(error)throw error;const ids=new Set(data.map(x=>x.id));data.forEach(x=>{const i=H.log.findIndex(y=>y.id===x.id);if(i<0)H.log.push(x);else H.log[i]=x});DB.save();await push(H.log.filter(x=>!ids.has(x.id)))}catch(e){}
  try{const r=await sb.from('page_days').select('d,n');if(!r.error){const have=new Set(r.data.map(x=>x.d));r.data.forEach(x=>H.pd[x.d]=x.n);DB.save();const loc=Object.keys(H.pd).filter(k=>!have.has(k));if(loc.length)await sb.from('page_days').upsert(loc.map(k=>({d:k,n:H.pd[k],user_id:U.id})),{onConflict:'user_id,d'})}}catch(e){}
- try{const r=await sb.from('books').select('id,data');if(!r.error){const have=new Set(r.data.map(x=>x.id));r.data.forEach(x=>{const i=H.books.findIndex(y=>y.id===x.id);if(i<0)H.books.push(x.data);else H.books[i]=x.data});DB.save();const loc=H.books.filter(b=>!have.has(b.id));if(loc.length)await sb.from('books').upsert(loc.map(b=>({id:b.id,data:b,user_id:U.id})),{onConflict:'user_id,id'})}}catch(e){}}
+ try{const r=await sb.from('books').select('id,data');if(!r.error){const have=new Set(r.data.map(x=>x.id));r.data.forEach(x=>{const i=H.books.findIndex(y=>y.id===x.id);if(i<0)H.books.push(x.data);else H.books[i]=x.data});DB.save();const loc=H.books.filter(b=>!have.has(b.id));if(loc.length)await sb.from('books').upsert(loc.map(b=>({id:b.id,data:b,user_id:U.id})),{onConflict:'user_id,id'})}}catch(e){}
+ try{const r=await sb.from('notes').select('id,data');if(!r.error){const have=new Set(r.data.map(x=>x.id));r.data.forEach(x=>{const i=H.notes.findIndex(y=>y.id===x.id);if(i<0)H.notes.push(x.data);else H.notes[i]=x.data});DB.save();const loc=H.notes.filter(n=>!have.has(n.id));if(loc.length)await sb.from('notes').upsert(loc.map(n=>({id:n.id,data:n,user_id:U.id})),{onConflict:'user_id,id'})}}catch(e){}}
 const bpt={};
 function pushBook(b){if(!sb||!U)return;clearTimeout(bpt[b.id]);bpt[b.id]=setTimeout(async()=>{try{await sb.from('books').upsert({id:b.id,data:b,user_id:U.id},{onConflict:'user_id,id'})}catch(e){}},600)}
 function bookPages(d){if(!d||view!=='session'||!S||!S.bid)return;const b=H.books.find(x=>x.id===S.bid);if(!b)return;b.read=Math.max(0,(b.read||0)+d);if(b.total&&b.read>=b.total&&b.status!=='done'){b.status='done';b.end=dk(Date.now())}pushBook(b)}
+function pushNote(n){if(!sb||!U)return;clearTimeout(bpt['n'+n.id]);bpt['n'+n.id]=setTimeout(async()=>{try{await sb.from('notes').upsert({id:n.id,data:n,user_id:U.id},{onConflict:'user_id,id'})}catch(e){}},600)}
+function addNote(x,X){const n={id:Date.now()+Math.floor(Math.random()*1000),t:Date.now(),x:x,bk:X?X.book:'',bid:X?X.bid:0,d:false};H.notes.push(n);DB.save();pushNote(n);return n}
+function setNoteDone(it){const n=H.notes.find(x=>x.id===it.nid);if(n){n.d=!!it.d;DB.save();pushNote(n)}}
+function syncPocket(){let ch=0;OS.forEach(X=>(X.pocket||[]).forEach(it=>{if(!it.nid){const n=addNote(it.t,X);n.d=!!it.d;it.nid=n.id;DB.save();pushNote(n);ch=1}}));if(ch)persist()}
 function bookMins(X){const b=H.books.find(y=>y.id===X.bid);if(b){b.mins=(b.mins||0)+X.m;pushBook(b)}}
 const ymOf=d=>d.getFullYear()+'-'+pad(d.getMonth()+1);
 const mIdx=ym=>{const a=ym.split('-');return +a[0]*12+(+a[1])-1};
@@ -110,7 +115,7 @@ function setup(){
  <select id="m"><option>20</option><option selected>25</option><option>30</option><option>40</option></select>
  <p class="mut" id="tot"></p>
  <button class="big" id="st">يلا نبلّش الرحلة</button>
- <button class="ghost big" id="sb" style="margin-top:10px">لوحة الإنجاز</button><button class="ghost big" id="lb" style="margin-top:10px">مكتبتي</button>`;
+ <button class="ghost big" id="sb" style="margin-top:10px">لوحة الإنجاز</button><button class="ghost big" id="lb" style="margin-top:10px">مكتبتي</button><button class="ghost big" id="nt" style="margin-top:10px">دفتر الفضول</button>`;
  const calc=()=>{const n=+$('n').value,m=+$('m').value,t=n*m+(n-1)*5;$('tot').textContent='المجموع تقريبًا: '+Math.floor(t/60)+' ساعة و'+t%60+' دقيقة، مع الاستراحات.'};
  $('n').onchange=$('m').onchange=calc;calc();
  const bs=$('bs'),open=H.books.filter(b=>b.status!=='done').sort((a,b)=>(a.status==='reading'?0:1)-(b.status==='reading'?0:1));
@@ -118,9 +123,9 @@ function setup(){
  const o0=document.createElement('option');o0.value='0';o0.textContent='+ كتاب جديد (بينضاف لمكتبتي)';bs.append(o0);
  const sel=open.find(b=>b.id===H.sel)||open[0];bs.value=sel?sel.id:0;
  const tg=()=>{$('nbk').style.display=bs.value==='0'?'':'none'};bs.onchange=tg;tg();
- $('sb').onclick=stats;$('lb').onclick=lib;gmUI();osUI();
+ $('sb').onclick=stats;$('lb').onclick=lib;$('nt').onclick=notes;gmUI();osUI();
  if(sb){const b=document.createElement('button');b.className='ghost big';b.style.marginTop='10px';
-  if(U){b.textContent='تسجيل خروج ('+U.email+')';b.onclick=async()=>{try{await sb.auth.signOut()}catch(e){}U=null;try{localStorage.removeItem('rr_guest')}catch(e){}H={log:[],pd:{},books:[]};OS=[];S=null;persist();DB.save();login()}}
+  if(U){b.textContent='تسجيل خروج ('+U.email+')';b.onclick=async()=>{try{await sb.auth.signOut()}catch(e){}U=null;try{localStorage.removeItem('rr_guest')}catch(e){}H={log:[],pd:{},books:[],notes:[]};OS=[];S=null;persist();DB.save();login()}}
   else{b.textContent='سجّلي دخول لحفظ بياناتك على الكلاود';b.onclick=()=>login()}
   app.append(b)}
  $('st').onclick=()=>{
@@ -153,7 +158,7 @@ function trail(){let h='<div class="trail">';for(let i=1;i<=S.n;i++){const d=i<S
 function drawList(el,edit){
  el.innerHTML='';
  S.pocket.forEach((it,i)=>{const li=document.createElement('li'),sp=document.createElement('span');sp.textContent=it.t;
-  if(edit){const cb=document.createElement('input');cb.type='checkbox';cb.checked=it.d;cb.onchange=()=>{it.d=cb.checked;li.className=it.d?'d':''};li.className=it.d?'d':'';li.append(cb)}
+  if(edit){const cb=document.createElement('input');cb.type='checkbox';cb.checked=it.d;cb.onchange=()=>{it.d=cb.checked;li.className=it.d?'d':'';setNoteDone(it)};li.className=it.d?'d':'';li.append(cb)}
   li.append(sp);el.append(li)});
 }
 function render(){
@@ -171,7 +176,7 @@ function render(){
   <div class="row"><button class="ghost" id="pz">وقفة</button><button class="ghost" id="ds">شردت</button></div>
   <p class="msg" id="ms"></p>`;
   $('bk').textContent=S.book;drawList($('pl'),false);pcUI();$('p1').onclick=()=>{addPages(1);pcUI()};$('pm').onclick=()=>{addPages(-1);pcUI()};
-  const add=()=>{const v=$('pi').value.trim();if(!v)return;S.pocket.push({t:v,d:false});S.pk++;$('pi').value='';drawList($('pl'),false);$('pi').focus()};
+  const add=()=>{const v=$('pi').value.trim();if(!v)return;S.pocket.push({t:v,d:false,nid:addNote(v,S).id});S.pk++;$('pi').value='';drawList($('pl'),false);$('pi').focus()};
   $('pa').onclick=add;$('pi').onkeydown=e=>{if(e.key==='Enter')add()};
   $('ds').onclick=()=>{S.dis++;$('ms').textContent=cheer[Math.floor(Math.random()*cheer.length)]};
   $('pz').onclick=()=>{if(S.paused){S.end=Date.now()+S.rem;S.paused=0;$('pz').textContent='وقفة'}else{S.rem=S.end-Date.now();S.paused=1;$('pz').textContent='كمّلي'}};if(S.paused)$('pz').textContent='كمّلي';
@@ -262,6 +267,33 @@ function editBook(id){
   DB.save();pushBook(b);lib()};
  $('edl').onclick=()=>{if($('edl').dataset.s){H.books=H.books.filter(x=>x.id!==b.id);DB.save();if(sb&&U)try{sb.from('books').delete().eq('id',b.id).then(()=>{},()=>{})}catch(e){}lib()}else{$('edl').dataset.s=1;$('edl').textContent='متأكدة؟ اضغطي كمان مرة'}};
 }
+let nf='open';
+function notes(){
+ view='notes';document.title='دفتر الفضول';syncPocket();
+ const N=H.notes.slice().sort((a,b)=>b.t-a.t),sh=N.filter(n=>nf==='all'||(nf==='open'?!n.d:n.d));
+ app.innerHTML=`<h2>دفتر الفضول</h2><div id="os"></div>
+ <p class="mut">كل شي بتسجليه بجيب الفضول بينحفظ هون، حتى بعد ما تخلص الجلسة.</p>
+ <div class="pk"><input id="ni" placeholder="سجّلي شي جديد"><button id="na">سجّلي</button></div>
+ <div class="row"><button class="${nf==='open'?'':'ghost'}" data-f="open">لسا</button><button class="${nf==='done'?'':'ghost'}" data-f="done">دوّرت عليه</button><button class="${nf==='all'?'':'ghost'}" data-f="all">الكل (${N.length})</button></div>
+ ${sh.length?`<ul>${sh.map(n=>`<li class="${n.d?'d':''}"><input type="checkbox" data-n="${n.id}" ${n.d?'checked':''}><span style="flex:1">${esc(n.x)}<br><small class="mut">${n.bk?esc(n.bk)+' | ':''}${dk(n.t)}</small></span><button class="ghost" data-x="${n.id}" style="padding:4px 10px">✕</button></li>`).join('')}</ul>`:'<p class="mut">ما في ملاحظات هون.</p>'}
+ <button class="big" id="bk">رجوع</button>`;
+ osUI();$('bk').onclick=setup;
+ const add=()=>{const v=$('ni').value.trim();if(!v)return;addNote(v,null);notes()};
+ $('na').onclick=add;$('ni').onkeydown=e=>{if(e.key==='Enter')add()};
+ app.onclick=e=>{const d=e.target.dataset||{};if(view!=='notes')return;
+  if(d.f){nf=d.f;notes()}
+  else if(d.n){const n=H.notes.find(x=>x.id===+d.n);if(n){n.d=e.target.checked;DB.save();pushNote(n);notes()}}
+  else if(d.x){if(d.s){const id=+d.x;H.notes=H.notes.filter(x=>x.id!==id);DB.save();if(sb&&U)try{sb.from('notes').delete().eq('id',id).then(()=>{},()=>{})}catch(er){}notes()}else{e.target.dataset.s=1;e.target.textContent='متأكدة؟'}}};
+}
+function raw(){
+ view='raw';document.title='البيانات الخام';let a='',b='';
+ try{a=localStorage.getItem('rr')||'';b=localStorage.getItem('rr_s')||''}catch(e){}
+ app.innerHTML=`<h2>البيانات الخام</h2><p class="mut">كل شي محفوظ على هالجهاز بهالمتصفح. اضغطي جوّا المربع، حدّدي الكل وانسخي.</p>
+ <h3>الجلسات المفتوحة (فيها ملاحظاتك)</h3><textarea id="r1" rows="9" readonly dir="ltr"></textarea>
+ <h3>باقي البيانات</h3><textarea id="r2" rows="9" readonly dir="ltr"></textarea>
+ <button class="big" id="bk">رجوع</button>`;
+ $('r1').value=b||'ما في شي';$('r2').value=a||'ما في شي';$('bk').onclick=stats;
+}
 let gopen=false;
 const MN=['كانون الثاني','شباط','آذار','نيسان','أيار','حزيران','تموز','آب','أيلول','تشرين الأول','تشرين الثاني','كانون الأول'];
 function stats(){
@@ -310,7 +342,7 @@ function stats(){
  <div><b>${hrs?(dis/hrs).toFixed(1):0}</b>شرود بالساعة</div><div><b>${best}</b>أطول يوم بالدقايق</div></div>
  ${chart('دقايق القراءة، آخر 14 يوم',m)}${chart('الصفحات، آخر 14 يوم',pv)}
  <h3>بياناتك</h3><div class="row"><button class="ghost" id="ec">تصدير CSV</button><button class="ghost" id="ej">نسخة احتياطية</button></div>
- <div class="row"><button class="ghost" id="im">استيراد نسخة</button></div><input type="file" id="fi" accept=".json" hidden>
+ <div class="row"><button class="ghost" id="im">استيراد نسخة</button><button class="ghost" id="rw">عرض البيانات الخام</button></div><input type="file" id="fi" accept=".json" hidden>
  <p class="msg" id="ms"></p><button class="big" id="bk">رجوع</button>`;
  $('p1').onclick=()=>{addPages(1);stats()};$('p10').onclick=()=>{addPages(10);stats()};$('pm').onclick=()=>{addPages(-1);stats()};
  $('dt').ontoggle=()=>{gopen=$('dt').open};
@@ -318,14 +350,14 @@ function stats(){
  $('bk').onclick=setup;osUI();
  $('ec').onclick=()=>dl('reading.csv','\uFEFFdate,book,minutes,pages,distractions,curiosities,stages\n'+L.map(x=>[dk(x.t),'"'+String(x.book).replace(/"/g,'""')+'"',x.mins,x.pages,x.dis,x.pk,x.stages].join(',')).join('\n'),'text/csv');
  $('ej').onclick=()=>dl('reading-backup.json',JSON.stringify(H),'application/json');
- $('im').onclick=()=>$('fi').click();
- $('fi').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.log))throw 0;d.log.forEach(x=>{if(!H.log.some(y=>y.id===x.id))H.log.push(x)});(d.books||[]).forEach(x=>{if(!H.books.some(y=>y.id===x.id))H.books.push(x)});Object.keys(d.pd||{}).forEach(k=>{if((H.pd[k]||0)<d.pd[k])H.pd[k]=d.pd[k]});DB.save();stats()}catch(err){$('ms').textContent='الملف مش صالح.'}};r.readAsText(f)};
+ $('im').onclick=()=>$('fi').click();$('rw').onclick=raw;
+ $('fi').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.log))throw 0;d.log.forEach(x=>{if(!H.log.some(y=>y.id===x.id))H.log.push(x)});(d.notes||[]).forEach(x=>{if(!H.notes.some(y=>y.id===x.id))H.notes.push(x)});(d.books||[]).forEach(x=>{if(!H.books.some(y=>y.id===x.id))H.books.push(x)});Object.keys(d.pd||{}).forEach(k=>{if((H.pd[k]||0)<d.pd[k])H.pd[k]=d.pd[k]});DB.save();stats()}catch(err){$('ms').textContent='الملف مش صالح.'}};r.readAsText(f)};
 }
 /* حفظ الجلسة الجارية: لو طلعتي من الصفحة أو سكّر المتصفح، بترجعي تكملي من وين وقفتي */
 let lp=0;
 function persist(){try{localStorage.setItem('rr_s',OS.length?JSON.stringify({os:OS,cur:S?S.id:null,v:view}):'')}catch(e){}}
 function restore(){try{const j=localStorage.getItem('rr_s');if(!j)return false;let x=JSON.parse(j);if(x&&x.ph)x={os:[x],cur:x.id,v:'session'};if(!x||!Array.isArray(x.os))return false;OS=x.os.filter(o=>o&&o.id&&o.ph&&o.ph!=='done');if(!OS.length)return false;S=OS.find(o=>o.id===x.cur)||null;if(S&&x.v==='session'){render();tick();return true}setup();tick();return true}catch(e){return false}}
-const boot=()=>{if(!restore())setup()};
+const boot=()=>{const r=restore();syncPocket();if(!r)setup()};
 document.addEventListener('visibilitychange',()=>{if(document.hidden)persist();else tick()});
 addEventListener('pagehide',persist);
 function login(){

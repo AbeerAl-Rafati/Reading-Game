@@ -57,6 +57,7 @@ summary{cursor:pointer;color:var(--mut);margin-top:10px}
 .b2{position:relative;height:14px;background:var(--line);border-radius:8px}.b2 i{position:absolute;top:0;bottom:0;inset-inline-start:0;background:var(--acc);border-radius:8px}.b2 u{position:absolute;top:-3px;bottom:-3px;width:3px;background:var(--ink);border-radius:2px}
 .bd{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.bd span{border:2px solid var(--line);border-radius:20px;padding:4px 12px;font-size:.9rem;color:var(--mut);opacity:.55}.bd span.on{opacity:1;color:var(--ink);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 18%,transparent)}
 li{justify-content:space-between}li.g b{color:var(--ok)}li.b b{color:var(--bad)}
+.ck{display:flex;gap:10px;align-items:center;margin:6px 0;font-weight:400}.ck input{width:20px;height:20px;accent-color:var(--acc)}
 </style>
 </head>
 <body>
@@ -81,7 +82,7 @@ async function pull(){if(!sb||!U)return;try{const{data,error}=await sb.from('ses
  try{const r=await sb.from('notes').select('id,data');if(!r.error){const have=new Set(r.data.map(x=>x.id));r.data.forEach(x=>{const i=H.notes.findIndex(y=>y.id===x.id);if(i<0)H.notes.push(x.data);else H.notes[i]=x.data});DB.save();const loc=H.notes.filter(n=>!have.has(n.id));if(loc.length)await sb.from('notes').upsert(loc.map(n=>({id:n.id,data:n,user_id:U.id})),{onConflict:'user_id,id'})}}catch(e){}}
 const bpt={};
 function pushBook(b){if(!sb||!U)return;clearTimeout(bpt[b.id]);bpt[b.id]=setTimeout(async()=>{try{await sb.from('books').upsert({id:b.id,data:b,user_id:U.id},{onConflict:'user_id,id'})}catch(e){}},600)}
-function bookPages(d){if(!d||view!=='session'||!S||!S.bid)return;const b=H.books.find(x=>x.id===S.bid);if(!b)return;b.read=Math.max(0,(b.read||0)+d);if(b.total&&b.read>=b.total&&b.status!=='done'){b.status='done';b.end=dk(Date.now())}pushBook(b)}
+function bookPages(d){if(!d||view!=='session'||!S||!S.bid)return;const b=H.books.find(x=>x.id===S.bid);if(!b)return;b.read=Math.max(0,(b.read||0)+d);if(b.total&&b.read>=b.total&&b.status!=='done'&&b.kind!=='explore'){b.status='done';b.end=dk(Date.now())}pushBook(b)}
 function pushNote(n){if(!sb||!U)return;clearTimeout(bpt['n'+n.id]);bpt['n'+n.id]=setTimeout(async()=>{try{await sb.from('notes').upsert({id:n.id,data:n,user_id:U.id},{onConflict:'user_id,id'})}catch(e){}},600)}
 function addNote(x,X){const n={id:Date.now()+Math.floor(Math.random()*1000),t:Date.now(),x:x,bk:X?X.book:'',bid:X?X.bid:0,d:false};H.notes.push(n);DB.save();pushNote(n);return n}
 function setNoteDone(it){const n=H.notes.find(x=>x.id===it.nid);if(n){n.d=!!it.d;DB.save();pushNote(n)}}
@@ -108,7 +109,7 @@ function setup(){
  app.innerHTML=`<h1>رحلة القراءة</h1>
  <p class="mut">قسّمي القراءة لمراحل قصيرة. بين كل مرحلة استراحة محترمة، وأي شي بدك تدوري عليه بتسجليه وبتدوري عليه بالاستراحة.</p>
  <div id="os"></div><div class="card" id="gm"></div>
- <h3>جلسة جديدة</h3><label for="bs">شو الكتاب؟</label><select id="bs"></select><div id="nbk"><input id="book" placeholder="اسم الكتاب" style="margin-top:8px"><input id="bpg" type="number" min="0" inputmode="numeric" placeholder="عدد صفحاته (اختياري)" style="margin-top:8px"></div>
+ <h3>جلسة جديدة</h3><label for="bs">شو الكتاب؟</label><select id="bs"></select><div id="nbk"><input id="book" placeholder="اسم الكتاب" style="margin-top:8px"><input id="bpg" type="number" min="0" inputmode="numeric" placeholder="عدد صفحاته (اختياري)" style="margin-top:8px"><label class="ck" style="margin-top:8px"><input type="checkbox" id="bxp"> هاد كتاب استكشاف (تصفّح وجرّب)</label></div>
  <label for="n">كم مرحلة؟</label>
  <select id="n"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>6</option><option>8</option></select>
  <label for="m">كم دقيقة بالمرحلة؟</label>
@@ -119,10 +120,10 @@ function setup(){
  const calc=()=>{const n=+$('n').value,m=+$('m').value,t=n*m+(n-1)*5;$('tot').textContent='المجموع تقريبًا: '+Math.floor(t/60)+' ساعة و'+t%60+' دقيقة، مع الاستراحات.'};
  $('n').onchange=$('m').onchange=calc;calc();
  const bs=$('bs'),open=H.books.filter(b=>b.status!=='done').sort((a,b)=>(a.status==='reading'?0:1)-(b.status==='reading'?0:1));
- open.forEach(b=>{const o=document.createElement('option');o.value=b.id;o.textContent=b.title;bs.append(o)});
+ open.forEach(b=>{const o=document.createElement('option');o.value=b.id;o.textContent=(b.kind==='explore'?'🔎 ':'')+b.title;bs.append(o)});
  const o0=document.createElement('option');o0.value='0';o0.textContent='+ كتاب جديد (بينضاف لمكتبتي)';bs.append(o0);
  const sel=open.find(b=>b.id===H.sel)||open[0];bs.value=sel?sel.id:0;
- const tg=()=>{$('nbk').style.display=bs.value==='0'?'':'none'};bs.onchange=tg;tg();
+ const tg=()=>{$('nbk').style.display=bs.value==='0'?'':'none';const xb=H.books.find(x=>String(x.id)===String(bs.value));if(xb&&xb.kind==='explore'){$('n').value='2';calc()}};bs.onchange=tg;tg();$('bxp').onchange=()=>{if($('bxp').checked){$('n').value='2';calc()}};
  $('sb').onclick=stats;$('lb').onclick=lib;$('nt').onclick=notes;gmUI();osUI();
  if(sb){const b=document.createElement('button');b.className='ghost big';b.style.marginTop='10px';
   if(U){b.textContent='تسجيل خروج ('+U.email+')';b.onclick=async()=>{try{await sb.auth.signOut()}catch(e){}U=null;try{localStorage.removeItem('rr_guest')}catch(e){}H={log:[],pd:{},books:[],notes:[]};OS=[];S=null;persist();DB.save();login()}}
@@ -130,7 +131,7 @@ function setup(){
   app.append(b)}
  $('st').onclick=()=>{
   const bid=+$('bs').value;let bb=H.books.find(x=>x.id===bid);
-  if(!bb){const t=$('book').value.trim();if(!t){$('book').focus();return}bb={id:Date.now()+1,title:t,author:'',total:+$('bpg').value||0,subj:'',status:'reading',read:0,mins:0,rating:0,notes:'',start:dk(Date.now()),end:''};H.books.push(bb)}
+  if(!bb){const t=$('book').value.trim(),xp=$('bxp').checked;if(!t){$('book').focus();return}bb={kind:xp?'explore':'full',ex:xp?mkEx():null,id:Date.now()+1,title:t,author:'',total:+$('bpg').value||0,subj:'',status:'reading',read:0,mins:0,rating:0,notes:'',start:dk(Date.now()),end:''};H.books.push(bb)}
   S={book:bb.title,bid:bb.id,n:+$('n').value,m:+$('m').value,b:5,cur:1,pocket:[],pk:0,pages:0,dis:0,mins:0,id:Date.now(),done:0};OS.forEach(pauseS);OS.push(S);
   if(bb){H.sel=bb.id;bb.status='reading';if(!bb.start)bb.start=dk(Date.now());DB.save();pushBook(bb)}
   try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}
@@ -222,6 +223,7 @@ function finish(){
 function dk(t){const d=new Date(t);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
 function ago(i){const d=new Date();d.setHours(12);d.setDate(d.getDate()-i);return d}
 function dl(n,t,ty){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:ty}));a.download=n;a.click()}
+function mkEx(){return{intro:0,toc:0,heads:0,concl:0,target:20,lang:'',note:'',verdict:''}}
 const ST={want:'بدي أقراها',reading:'عم أقراها',done:'خلصتها'};
 function lib(){
  view='lib';document.title='مكتبتي';
@@ -231,21 +233,34 @@ function lib(){
   ${b.total?`<div class="bar"><i style="width:${pc}%"></i></div><p class="mut">${b.read||0} من ${b.total} صفحة (${pc}%) | ${hr} ساعة</p>`:`<p class="mut">${b.read||0} صفحة | ${hr} ساعة</p>`}
   ${b.start?`<p class="mut">بدأتيه: ${b.start}${b.end?' | خلصتيه: '+b.end:''}</p>`:''}${b.notes?`<p>${esc(b.notes)}</p>`:''}
   <div class="row">${b.status!=='done'?`<button data-a="go" data-i="${b.id}">ابدأ جلسة</button>`:''}<button class="ghost" data-a="ed" data-i="${b.id}">تعديل</button></div></div>`};
- const grp=st=>{const a=B.filter(b=>b.status===st);return a.length?`<h3>${ST[st]}</h3>`+a.map(card).join(''):''};
+ const grp=st=>{const a=B.filter(b=>b.status===st&&b.kind!=='explore');return a.length?`<h3>${ST[st]}</h3>`+a.map(card).join(''):''};
+ const NM={intro:'المقدمة',toc:'الفهرس',heads:'العناوين والفصول',concl:'الخاتمة'};
+ const exCard=b=>{const e=b.ex||{},n=Object.keys(NM).filter(k=>e[k]).length,tg=e.target||20,pc=Math.round(n/4*50+Math.min(1,(b.read||0)/tg)*50);
+  return `<div class="card"><div class="cr"><span><b>🔎 ${esc(b.title)}</b>${b.author?'<br><small class="mut">'+esc(b.author)+'</small>':''}</span><span>${n}/4</span></div>
+  <div class="bar"><i style="width:${pc}%"></i></div><p class="mut">قريتي ${b.read||0} من حوالي ${tg} صفحة، مش لازم بالضبط</p>
+  ${Object.keys(NM).map(k=>`<label class="ck"><input type="checkbox" data-a="ck" data-i="${b.id}" data-k="${k}" ${e[k]?'checked':''}> ${NM[k]}</label>`).join('')}
+  <div class="row"><button data-a="go" data-i="${b.id}">ابدأ جلسة</button><button class="ghost" data-a="vd" data-i="${b.id}">خلصت الاستكشاف</button></div>
+  <div class="row"><button class="ghost" data-a="ed" data-i="${b.id}">تعديل</button></div></div>`};
+ const exDone=b=>{const e=b.ex||{};return `<div class="card"><div class="cr"><span><b>🔎 ${esc(b.title)}</b></span><span>اكتفيتي</span></div><p class="mut">لغته: ${esc(e.lang||'-')} | ${b.read||0} صفحة${e.end?' | '+e.end:''}</p>${e.note?`<p>${esc(e.note)}</p>`:''}<div class="row"><button data-a="up" data-i="${b.id}">كمّلي قراءته</button><button class="ghost" data-a="ed" data-i="${b.id}">تعديل</button></div></div>`};
+ const exg=m=>{const a=B.filter(b=>b.kind==='explore'&&(m==='d'?b.status==='done':b.status!=='done'));return a.length?`<h3>${m==='d'?'استكشفتها':'استكشاف'}</h3>`+a.map(m==='d'?exDone:exCard).join(''):''};
  app.innerHTML=`<h2>مكتبتي</h2><div id="os"></div>
  <details class="card"><summary>+ كتاب جديد</summary>
  <label for="bt">اسم الكتاب</label><input id="bt"><label for="ba">المؤلف</label><input id="ba">
  <label for="bp">عدد الصفحات</label><input id="bp" type="number" min="0" inputmode="numeric">
  <label for="bj">التصنيف</label><input id="bj" placeholder="مثلًا: تاريخ، فلسفة، شريعة">
+ <label for="bkd">نوع القراءة</label><select id="bkd"><option value="full">قراءة كاملة</option><option value="explore">استكشاف: تصفّح وجرّب</option></select>
  <label for="bz">الحالة</label><select id="bz"><option value="want">بدي أقراه</option><option value="reading">عم أقراه</option><option value="done">خلصته</option></select>
  <button class="big" id="bsv">إضافة</button></details>
- ${grp('reading')}${grp('want')}${grp('done')}${B.length?'':'<p class="mut">ما في كتب لسا. ضيفي أول كتاب.</p>'}
+ ${grp('reading')}${exg('x')}${grp('want')}${grp('done')}${exg('d')}${B.length?'':'<p class="mut">ما في كتب لسا. ضيفي أول كتاب.</p>'}
  <button class="big" id="bk">رجوع</button>`;
  osUI();$('bk').onclick=setup;
  $('bsv').onclick=()=>{const t=$('bt').value.trim();if(!t){$('bt').focus();return}const z=$('bz').value;
-  const b={id:Date.now(),title:t,author:$('ba').value.trim(),total:+$('bp').value||0,subj:$('bj').value.trim(),status:z,read:0,mins:0,rating:0,notes:'',start:z==='want'?'':td(),end:z==='done'?td():''};
+  const b={id:Date.now(),title:t,author:$('ba').value.trim(),total:+$('bp').value||0,subj:$('bj').value.trim(),status:z,read:0,mins:0,rating:0,notes:'',start:z==='want'?'':td(),end:z==='done'?td():'',kind:$('bkd').value,ex:$('bkd').value==='explore'?mkEx():null};
   H.books.push(b);DB.save();pushBook(b);lib()};
- app.onclick=e=>{const d=e.target.dataset||{};if(view!=='lib'||!d.a)return;const id=+d.i;if(d.a==='go'){H.sel=id;DB.save();setup()}else if(d.a==='ed')editBook(id)};
+ app.onclick=e=>{const d=e.target.dataset||{};if(view!=='lib'||!d.a)return;const id=+d.i;if(d.a==='go'){H.sel=id;DB.save();setup()}else if(d.a==='ed')editBook(id);
+  else if(d.a==='vd')verdict(id);
+  else if(d.a==='up'){const b=H.books.find(x=>x.id===id);if(b){b.kind='full';b.status='reading';if(b.ex)b.ex.verdict='cont';DB.save();pushBook(b);lib()}}
+  else if(d.a==='ck'){const b=H.books.find(x=>x.id===id);if(b){b.ex=b.ex||mkEx();b.ex[d.k]=e.target.checked?1:0;DB.save();pushBook(b);lib()}}};
 }
 function editBook(id){
  view='lib';const b=H.books.find(x=>x.id===id);if(!b)return lib();
@@ -257,15 +272,28 @@ function editBook(id){
  <label for="e6">الحالة</label><select id="e6"><option value="want">بدي أقراه</option><option value="reading">عم أقراه</option><option value="done">خلصته</option></select>
  <label for="e7">تقييمك</label><select id="e7"><option value="0">بدون</option><option value="1">★</option><option value="2">★★</option><option value="3">★★★</option><option value="4">★★★★</option><option value="5">★★★★★</option></select>
  <label for="e9">تاريخ البداية</label><input id="e9" type="date" value="${esc(b.start||'')}"><label for="e10">تاريخ الانتهاء</label><input id="e10" type="date" value="${esc(b.end||'')}">
+ <label for="e11">نوع القراءة</label><select id="e11"><option value="full">كاملة</option><option value="explore">استكشاف</option></select><label for="e12">هدف صفحات الاستكشاف</label><input id="e12" type="number" min="1" value="${(b.ex&&b.ex.target)||20}">
  <label for="e8">ملاحظات</label><textarea id="e8" rows="3">${esc(b.notes||'')}</textarea>
  <div class="row"><button id="es">حفظ</button><button class="ghost" id="ex">إلغاء</button></div><button class="ghost big" id="edl">حذف الكتاب</button>`;
- $('e6').value=b.status;$('e7').value=b.rating||0;
+ $('e6').value=b.status;$('e11').value=b.kind==='explore'?'explore':'full';$('e7').value=b.rating||0;
  $('ex').onclick=lib;
- $('es').onclick=()=>{const t=$('e1').value.trim();if(!t)return;b.title=t;b.author=$('e2').value.trim();b.total=+$('e3').value||0;b.read=+$('e4').value||0;b.subj=$('e5').value.trim();b.rating=+$('e7').value;b.notes=$('e8').value.trim();
+ $('es').onclick=()=>{const t=$('e1').value.trim();if(!t)return;b.title=t;b.author=$('e2').value.trim();b.total=+$('e3').value||0;b.read=+$('e4').value||0;b.subj=$('e5').value.trim();b.rating=+$('e7').value;b.notes=$('e8').value.trim();b.kind=$('e11').value;if(b.kind==='explore'||b.ex){b.ex=b.ex||mkEx();b.ex.target=+$('e12').value||20}
   const z=$('e6').value;if(z!==b.status){b.status=z;const d=dk(Date.now());if(z==='reading'&&!b.start)b.start=d;if(z==='done'&&!b.end)b.end=d}
   const sd=$('e9').value,ed=$('e10').value;if(sd)b.start=sd;if(ed)b.end=ed;if(b.status!=='done')b.end='';
   DB.save();pushBook(b);lib()};
  $('edl').onclick=()=>{if($('edl').dataset.s){H.books=H.books.filter(x=>x.id!==b.id);DB.save();if(sb&&U)try{sb.from('books').delete().eq('id',b.id).then(()=>{},()=>{})}catch(e){}lib()}else{$('edl').dataset.s=1;$('edl').textContent='متأكدة؟ اضغطي كمان مرة'}};
+}
+function verdict(id){
+ view='lib';const b=H.books.find(x=>x.id===id);if(!b)return lib();const e=b.ex=b.ex||mkEx();
+ app.innerHTML=`<h2>خلصتي الاستكشاف؟</h2><p class="mut">${esc(b.title)}</p>
+ <label for="v1">لغته وأسلوبه، كيف حسّيتيه؟</label><select id="v1"><option>سهلة وواضحة</option><option>متوسطة</option><option>صعبة بس ممكن</option><option>ثقيلة هلأ</option></select>
+ <label for="v2">انطباعك (اختياري)</label><textarea id="v2" rows="3"></textarea>
+ <h3>شو قرارك؟</h3><div class="row"><button id="vc">بكمّل قراءته</button></div>
+ <div class="row"><button class="ghost" id="vl">بأجّله لوقت ثاني</button><button class="ghost" id="vs">كفاية هيك</button></div>
+ <button class="ghost big" id="vx">رجوع</button>`;
+ $('vx').onclick=lib;
+ const fin=(v,k,st)=>{e.lang=$('v1').value;e.note=$('v2').value.trim();e.verdict=v;e.end=dk(Date.now());if(k)b.kind='full';b.status=st;if(st==='done')b.end=e.end;DB.save();pushBook(b);lib()};
+ $('vc').onclick=()=>fin('cont',1,'reading');$('vl').onclick=()=>fin('later',1,'want');$('vs').onclick=()=>fin('stop',0,'done');
 }
 let nf='open';
 function notes(){
@@ -313,7 +341,7 @@ function stats(){
  const cmp=(pa||pb)?`<p>بنفس اليوم من الشهر: <b>${pa}</b> صفحة هالشهر مقابل <b>${pb}</b> الشهر اللي قبل ${chg(pa,pb)}، و<b>${ma}</b> دقيقة مقابل <b>${mb}</b> ${chg(ma,mb)}.</p>`:'<p class="mut">لما يكتمل شهر كامل بتظهر المقارنة هون.</p>';
  const rows=[];for(let k=mIdx(GOAL.start);k<=mIdx(ym);k++){const key=Math.floor(k/12)+'-'+pad(k%12+1);rows.push({key,p:mPages(key),g:goalFor(key),mi:mM(key)})}
  const mx=Math.max(1,...rows.map(r=>Math.max(r.p,r.g)));
- const bks=H.books,bm=(k,y)=>bks.filter(b=>(b[k]||'').startsWith(y+'-')).length;
+ const bks=H.books.filter(b=>b.kind!=='explore'),ex=H.books.filter(b=>b.ex&&b.ex.verdict),bm=(k,y)=>bks.filter(b=>(b[k]||'').startsWith(y+'-')).length;
  const mon=rows.slice(-6).map(r=>`<div class="mr"><span>${MN[+r.key.split('-')[1]-1]}</span><div class="b2"><i style="width:${r.p/mx*100}%"></i><u style="inset-inline-start:${r.g/mx*100}%"></u></div><b>${r.p}/${r.g}</b>${(()=>{const a=bm('start',r.key),f=bm('end',r.key);return a||f?`<small class="mut" style="grid-column:1/-1">كتب: بدأتي ${a} | خلصتي ${f}</small>`:''})()}</div>`).join('');
  const tl=(lab,a,b,low)=>{if(!a&&!b)return'';const eq=a===b,up=a>b,good=up!==!!low;return `<li class="${eq?'':good?'g':'b'}"><span>${eq?'●':up?'▲':'▼'} ${lab}</span><b>${b?Math.round(Math.abs(a-b)/b*100)+'%':'جديد'}</b></li>`};
  const m1=sr(m,0,7),m2=sr(m,7,14),r1=m1?sr(ds,0,7)/(m1/60):0,r2=m2?sr(ds,7,14)/(m2/60):0;
@@ -321,8 +349,8 @@ function stats(){
  const mins=L.reduce((a,x)=>a+x.mins,0),hrs=mins/60,dis=L.reduce((a,x)=>a+x.dis,0),tp=Object.values(H.pd).reduce((a,b)=>a+b,0);
  let streak=0;for(let i=0;i<400;i++){if(m(i)>0||pv(i)>0)streak++;else if(i>0)break}
  const am=Object.keys(by).filter(k=>by[k].m>0).length,best=Math.max(0,...Object.values(by).map(v=>v.m));
- const bd=[['📖','أول 100 صفحة',tp>=100],['📚','500 صفحة',tp>=500],['⛰️','1000 صفحة',tp>=1000],['🏆','حققتي تحدي شهر',rows.some(r=>r.p>=r.g)],['🔥','7 أيام متتالية',streak>=7],['⏳','جلسة كاملة',L.some(x=>x.stages>=6)],['📕','خلصتي كتاب',H.books.some(b=>b.status==='done')]].map(x=>`<span class="${x[2]?'on':''}">${x[0]} ${x[1]}</span>`).join('');
- const nb=[[bm('start',ym),'بدأتي هالشهر'],[bm('end',ym),'خلصتي هالشهر'],[bks.filter(b=>b.status==='reading').length,'عم تقراها هلأ'],[bks.filter(b=>b.start).length,'بدأتي بالمجموع'],[bks.filter(b=>b.status==='done').length,'خلصتي بالمجموع'],[bks.filter(b=>b.status==='want').length,'بدي أقراها']].map(x=>`<div><b>${x[0]}</b>${x[1]}</div>`).join('');
+ const bd=[['📖','أول 100 صفحة',tp>=100],['📚','500 صفحة',tp>=500],['⛰️','1000 صفحة',tp>=1000],['🏆','حققتي تحدي شهر',rows.some(r=>r.p>=r.g)],['🔥','7 أيام متتالية',streak>=7],['⏳','جلسة كاملة',L.some(x=>x.stages>=6)],['📕','خلصتي كتاب',bks.some(b=>b.status==='done')],['🔎','أول استكشاف',ex.length>0]].map(x=>`<span class="${x[2]?'on':''}">${x[0]} ${x[1]}</span>`).join('');
+ const nb=[[bm('start',ym),'بدأتي هالشهر'],[bm('end',ym),'خلصتي هالشهر'],[bks.filter(b=>b.status==='reading').length,'عم تقراها هلأ'],[bks.filter(b=>b.start).length,'بدأتي بالمجموع'],[bks.filter(b=>b.status==='done').length,'خلصتي بالمجموع'],[bks.filter(b=>b.status==='want').length,'بدي أقراها'],[H.books.filter(b=>b.kind==='explore'&&b.status!=='done').length,'قيد الاستكشاف'],[ex.length,'استكشفتي بالمجموع'],[ex.filter(b=>b.ex.verdict==='cont').length,'كمّلتي بعد الاستكشاف'],[ex.filter(b=>b.ex.verdict==='stop').length,'اكتفيتي بالاستكشاف']].map(x=>`<div><b>${x[0]}</b>${x[1]}</div>`).join('');
  const days=[];for(let i=13;i>=0;i--)days.push({i,n:ago(i).getDate()});
  const chart=(t,f)=>{const mm=Math.max(1,...days.map(d=>f(d.i)));return `<h3>${t}</h3><div class="ch">${days.map(d=>`<div><i style="height:${f(d.i)/mm*100}%"></i><small>${d.n}</small></div>`).join('')}</div>`};
  const cells=Array.from({length:g},(_,i)=>`<i data-i="${i}" class="${i<c?'on':''}"></i>`).join('');

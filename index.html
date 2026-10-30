@@ -95,8 +95,10 @@ const mIdx=ym=>{const a=ym.split('-');return +a[0]*12+(+a[1])-1};
 const goalFor=ym=>GOAL.base+GOAL.step*Math.max(0,mIdx(ym)-mIdx(GOAL.start));
 const mPages=ym=>Object.keys(H.pd).reduce((a,k)=>k.startsWith(ym+'-')?a+H.pd[k]:a,0);
 let pt=null;
-function addPages(k){const t=dk(Date.now());const bf=H.pd[t]||0;H.pd[t]=Math.max(0,bf+k);bookPages(H.pd[t]-bf);DB.save();if(sb&&U){clearTimeout(pt);pt=setTimeout(async()=>{try{await sb.from('page_days').upsert({d:t,n:H.pd[t]||0,user_id:U.id},{onConflict:'user_id,d'})}catch(e){}},500)}}
-function pcUI(){const ym=ymOf(new Date()),c=mPages(ym),g=goalFor(ym);if($('pc'))$('pc').textContent=c+' / '+g;if($('pb'))$('pb').style.width=Math.min(100,c/g*100)+'%'}
+function addPages(k){const t=dk(Date.now());const bf=H.pd[t]||0;H.pd[t]=Math.max(0,bf+k);const dd=H.pd[t]-bf;bookPages(dd);sessPages(dd);DB.save();if(sb&&U){clearTimeout(pt);pt=setTimeout(async()=>{try{await sb.from('page_days').upsert({d:t,n:H.pd[t]||0,user_id:U.id},{onConflict:'user_id,d'})}catch(e){}},500)}return dd}
+function sessPages(d){if(!d||view!=='session'||!S)return;S.sp=Math.max(0,(S.sp||0)+d);S.stp=Math.max(0,(S.stp||0)+d)}
+function pcUI(){const ym=ymOf(new Date()),c=mPages(ym),g=goalFor(ym);if($('pc'))$('pc').textContent=c+' / '+g;if($('pb'))$('pb').style.width=Math.min(100,c/g*100)+'%';
+ if($('sc')&&S){$('sc').textContent=S.sp||0;$('sd').textContent='هالمرحلة: '+(S.stp||0)+' | باقي لهدف الشهر: '+Math.max(0,g-c);$('pm').textContent=(S.hist&&S.hist.length)?'↩ تراجع عن '+S.hist[S.hist.length-1]:'↩ تراجع'}}
 function gmUI(){const ym=ymOf(new Date()),c=mPages(ym),g=goalFor(ym);$('gm').innerHTML=`<div class="cr"><span>هدف هالشهر</span><b>${c} / ${g}</b></div><div class="bar"><i style="width:${Math.min(100,c/g*100)}%"></i></div>`}
 function saveSess(){if(!S)return;const r={id:S.id,t:S.id,book:S.book,mins:S.mins,pages:S.pages,dis:S.dis,pk:S.pk,stages:S.done};const i=H.log.findIndex(x=>x.id===S.id);if(i<0)H.log.push(r);else H.log[i]=r;DB.save();push([r])}
 const pad=n=>String(n).padStart(2,'0');
@@ -145,7 +147,7 @@ function setup(){
 }
 function setPh(ph){
  S.ph=ph;S.fired=0;S.paused=0;
- if(ph==='read'){S.c0=mPages(ymOf(new Date()));S.end=Date.now()+S.m*60000}
+ if(ph==='read'){S.stp=0;S.c0=mPages(ymOf(new Date()));S.end=Date.now()+S.m*60000}
  if(ph==='break')S.end=Date.now()+S.b*60000;
 }
 function go(ph){setPh(ph);view='session';persist();render()}
@@ -175,14 +177,20 @@ function render(){
  if(S.ph==='read'){
   app.innerHTML=`<div class="top"><button class="ghost" id="hm" style="padding:6px 14px;font-size:.95rem">الرئيسية</button><span id="bk"></span><span>مرحلة ${S.cur} من ${S.n}</span></div>
   <div class="tree">${tree}</div><div class="time" id="tm">${fmt(S.paused?S.rem:S.end-Date.now())}</div>
-  <div class="bar"><i id="bf"></i></div>${trail()}<div class="card"><div class="cr"><span>صفحات الشهر</span><b id="pc"></b></div><div class="bar"><i id="pb"></i></div>
-  <div class="row"><button id="p1">✓ قريت صفحة</button><button class="ghost" id="pm" style="flex:0 0 64px">−1</button></div></div>
+  <div class="bar"><i id="bf"></i></div>${trail()}<div class="card"><div class="cr"><span>صفحات هالجلسة</span><b id="sc">0</b></div><p class="mut" id="sd"></p>
+  <div class="pk"><input id="pn" type="number" min="1" max="500" inputmode="numeric" placeholder="كم صفحة قريتي؟"><button id="pa2">+ أضيف</button></div>
+  <div class="row"><button id="p1">✓ صفحة +1</button><button class="ghost" id="pm">↩ تراجع</button></div>
+  <div class="cr" style="margin-top:14px"><span>صفحات الشهر</span><b id="pc"></b></div><div class="bar"><i id="pb"></i></div></div>
   <h3>جيب الفضول</h3><p class="mut">خطر ببالك شي بدك تدوري عليه؟ اكتبيه هون وكمّلي قراءة. بتدوري عليه بالاستراحة.</p>
   <div class="pk"><input id="pi" placeholder="مثلًا: مين كان هالشخص؟"><button id="pa">سجّلي</button></div>
   <ul id="pl"></ul>
   <div class="row"><button class="ghost" id="pz">وقفة</button><button class="ghost" id="ds">شردت</button></div>
   <p class="msg" id="ms"></p>`;
-  $('bk').textContent=S.book;drawList($('pl'),false);pcUI();$('p1').onclick=()=>{addPages(1);pcUI()};$('pm').onclick=()=>{addPages(-1);pcUI()};
+  $('bk').textContent=S.book;drawList($('pl'),false);pcUI();
+  const sa=k=>{S.hist=S.hist||[];const d=addPages(k);if(d)S.hist.push(d);if(S.hist.length>30)S.hist.shift();pcUI()};
+  $('p1').onclick=()=>sa(1);
+  $('pa2').onclick=()=>{const n=Math.floor(+$('pn').value);if(n>0&&n<=500){sa(n);$('pn').value=''}};$('pn').onkeydown=e=>{if(e.key==='Enter')$('pa2').onclick()};
+  $('pm').onclick=()=>{S.hist=S.hist||[];const k=S.hist.pop();if(k)addPages(-k);pcUI()};
   const add=()=>{const v=$('pi').value.trim();if(!v)return;S.pocket.push({t:v,d:false,nid:addNote(v,S).id});S.pk++;$('pi').value='';drawList($('pl'),false);$('pi').focus()};
   $('pa').onclick=add;$('pi').onkeydown=e=>{if(e.key==='Enter')add()};
   $('ds').onclick=()=>{S.dis++;$('ms').textContent=cheer[Math.floor(Math.random()*cheer.length)]};

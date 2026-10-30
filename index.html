@@ -110,14 +110,15 @@ function setup(){
  app.innerHTML=`<h1>رحلة القراءة</h1>
  <p class="mut">قسّمي القراءة لمراحل قصيرة. بين كل مرحلة استراحة محترمة، وأي شي بدك تدوري عليه بتسجليه وبتدوري عليه بالاستراحة.</p>
  <div id="os"></div><div class="card" id="gm"></div>
- <h3>جلسة جديدة</h3><label for="bs">شو الكتاب؟</label><select id="bs"></select><div id="nbk"><input id="book" placeholder="اسم الكتاب" style="margin-top:8px"><input id="bpg" type="number" min="0" inputmode="numeric" placeholder="عدد صفحاته (اختياري)" style="margin-top:8px"><label class="ck" style="margin-top:8px"><input type="checkbox" id="bxp"> هاد كتاب استكشاف (تصفّح وجرّب)</label></div>
+ <h3>جلسة جديدة</h3><label for="bs">شو الكتاب؟</label><select id="bs"></select><div id="nbk"><input id="book" placeholder="اسم الكتاب" style="margin-top:8px"><input id="bpg" type="number" min="0" inputmode="numeric" placeholder="عدد صفحاته (اختياري)" style="margin-top:8px"><label class="ck" style="margin-top:8px"><input type="checkbox" id="bxp"> هاد كتاب استكشاف (تصفّح وجرّب)</label>
+ <button class="ghost big" id="qa2" style="margin-top:8px">أضيفه لمكتبتي بس، بدون جلسة</button></div><p class="msg" id="qm"></p>
  <label for="n">كم مرحلة؟</label>
  <select id="n"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>6</option><option>8</option></select>
  <label for="m">كم دقيقة بالمرحلة؟</label>
  <select id="m"><option>20</option><option selected>25</option><option>30</option><option>40</option></select>
  <p class="mut" id="tot"></p>
  <button class="big" id="st">يلا نبلّش الرحلة</button>
- <button class="ghost big" id="sb" style="margin-top:10px">لوحة الإنجاز</button><button class="ghost big" id="lb" style="margin-top:10px">مكتبتي</button><button class="ghost big" id="nt" style="margin-top:10px">دفتر الفضول</button><div id="exh"></div><div id="ext"></div>`;
+ <button class="ghost big" id="sb" style="margin-top:10px">لوحة الإنجاز</button><button class="ghost big" id="lb" style="margin-top:10px">مكتبتي</button><button class="ghost big" id="nt" style="margin-top:10px">دفتر الفضول</button>`;
  const calc=()=>{const n=+$('n').value,m=+$('m').value,t=n*m+(n-1)*5;$('tot').textContent='المجموع تقريبًا: '+Math.floor(t/60)+' ساعة و'+t%60+' دقيقة، مع الاستراحات.'};
  $('n').onchange=$('m').onchange=calc;calc();
  const bs=$('bs'),open=H.books.filter(b=>b.status!=='done').sort((a,b)=>(a.status==='reading'?0:1)-(b.status==='reading'?0:1));
@@ -125,7 +126,10 @@ function setup(){
  const o0=document.createElement('option');o0.value='0';o0.textContent='+ كتاب جديد (بينضاف لمكتبتي)';bs.append(o0);
  const sel=open.find(b=>b.id===H.sel)||open[0];bs.value=sel?sel.id:0;
  const tg=()=>{$('nbk').style.display=bs.value==='0'?'':'none';const xb=H.books.find(x=>String(x.id)===String(bs.value));if(xb&&xb.kind==='explore'){$('n').value='2';calc()}};bs.onchange=tg;tg();$('bxp').onchange=()=>{if($('bxp').checked){$('n').value='2';calc()}};
- $('sb').onclick=stats;$('lb').onclick=lib;$('nt').onclick=notes;gmUI();osUI();$('exh').innerHTML=exHome();$('ext').innerHTML=exTable();app.onclick=bookClick;
+ $('sb').onclick=stats;$('lb').onclick=lib;$('nt').onclick=notes;gmUI();osUI();$('qm').textContent=qmsg;qmsg='';
+ $('qa2').onclick=()=>{const t=$('book').value.trim();if(!t){$('book').focus();return}const xp=$('bxp').checked;
+  const b={id:Date.now(),title:t,author:'',total:+$('bpg').value||0,subj:'',status:'want',read:0,mins:0,rating:0,notes:'',start:'',end:'',kind:xp?'explore':'full',ex:xp?mkEx():null};
+  H.books.push(b);DB.save();pushBook(b);qmsg='انضاف "'+t+'" لمكتبتي'+(xp?' بقسم الاستكشاف':'')+'.';setup()};
  if(sb){const b=document.createElement('button');b.className='ghost big';b.style.marginTop='10px';
   if(U){b.textContent='تسجيل خروج ('+U.email+')';b.onclick=async()=>{try{await sb.auth.signOut()}catch(e){}U=null;try{localStorage.removeItem('rr_guest')}catch(e){}H={log:[],pd:{},books:[],notes:[]};OS=[];S=null;persist();DB.save();login()}}
   else{b.textContent='سجّلي دخول لحفظ بياناتك على الكلاود';b.onclick=()=>login()}
@@ -225,6 +229,7 @@ function dk(t){const d=new Date(t);return d.getFullYear()+'-'+pad(d.getMonth()+1
 function ago(i){const d=new Date();d.setHours(12);d.setDate(d.getDate()-i);return d}
 function dl(n,t,ty){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:ty}));a.download=n;a.click()}
 function mkEx(){return{intro:0,toc:0,heads:0,concl:0,target:20,lang:'',note:'',verdict:''}}
+let lt='full',qmsg='';
 const ST={want:'بدي أقراها',reading:'عم أقراها',done:'خلصتها'};
  const NM={intro:'المقدمة',toc:'الفهرس',heads:'العناوين والفصول',concl:'الخاتمة'};
  const exCard=b=>{const e=b.ex||{},n=Object.keys(NM).filter(k=>e[k]).length,tg=e.target||20,pc=Math.round(n/4*50+Math.min(1,(b.read||0)/tg)*50);
@@ -235,11 +240,10 @@ const ST={want:'بدي أقراها',reading:'عم أقراها',done:'خلصت�
   <div class="row"><button class="ghost" data-a="ed" data-i="${b.id}">تعديل</button></div></div>`};
  const exDone=b=>{const e=b.ex||{};return `<div class="card"><div class="cr"><span><b>🔎 ${esc(b.title)}</b></span><span>اكتفيتي</span></div><p class="mut">لغته: ${esc(e.lang||'-')} | ${b.read||0} صفحة${e.end?' | '+e.end:''}</p>${e.note?`<p>${esc(e.note)}</p>`:''}<div class="row"><button data-a="up" data-i="${b.id}">كمّلي قراءته</button><button class="ghost" data-a="ed" data-i="${b.id}">تعديل</button></div></div>`};
 
-function exHome(){const a=H.books.filter(b=>b.kind==='explore'&&b.status!=='done');return `<h3>🔎 الاستكشاف</h3>`+(a.length?a.map(exCard).join(''):'<p class="mut">ما عندك كتب استكشاف هلأ. ضيفي كتاب بنوع "استكشاف" من مكتبتي.</p>')}
 function exTable(){const a=H.books.filter(b=>b.kind==='explore'||(b.ex&&b.ex.verdict));if(!a.length)return '';const c=v=>v?'✓':'·';
  return `<h3>جدول الاستكشاف</h3><div style="overflow-x:auto"><table class="tb"><tr><th>الكتاب</th><th>مقدمة</th><th>فهرس</th><th>عناوين</th><th>خاتمة</th><th>صفحات</th><th>لغته</th><th>الحالة</th></tr>
  ${a.map(b=>{const e=b.ex||{},st=e.verdict==='cont'?'كمّلت':e.verdict==='later'?'أجّلت':e.verdict==='stop'?'اكتفيت':'عم أستكشفه';return `<tr><td>${esc(b.title)}</td><td>${c(e.intro)}</td><td>${c(e.toc)}</td><td>${c(e.heads)}</td><td>${c(e.concl)}</td><td>${b.read||0}/${e.target||20}</td><td>${esc(e.lang||'-')}</td><td>${st}</td></tr>`}).join('')}</table></div>`}
-function bookClick(e){const d=e.target.dataset||{};if((view!=='lib'&&view!=='home')||!d.a)return;const id=+d.i;
+function bookClick(e){const d=e.target.dataset||{};if(d.t&&view==='lib'){lt=d.t;lib();return}if((view!=='lib'&&view!=='home')||!d.a)return;const id=+d.i;
  const rf=()=>{const y=window.scrollY||0;if(view==='home')setup();else lib();if(window.scrollTo)window.scrollTo(0,y)};
  if(d.a==='go'){H.sel=id;DB.save();setup()}
  else if(d.a==='ed')editBook(id);
@@ -257,6 +261,7 @@ function lib(){
  const grp=st=>{const a=B.filter(b=>b.status===st&&b.kind!=='explore');return a.length?`<h3>${ST[st]}</h3>`+a.map(card).join(''):''};
  const exg=m=>{const a=B.filter(b=>b.kind==='explore'&&(m==='d'?b.status==='done':b.status!=='done'));return a.length?`<h3>${m==='d'?'استكشفتها':'استكشاف'}</h3>`+a.map(m==='d'?exDone:exCard).join(''):''};
  app.innerHTML=`<h2>مكتبتي</h2><div id="os"></div>
+ <div class="row"><button class="${lt==='full'?'':'ghost'}" data-t="full">كتب القراءة</button><button class="${lt==='explore'?'':'ghost'}" data-t="explore">🔎 الاستكشاف (${B.filter(b=>b.kind==='explore').length})</button></div>
  <details class="card"><summary>+ كتاب جديد</summary>
  <label for="bt">اسم الكتاب</label><input id="bt"><label for="ba">المؤلف</label><input id="ba">
  <label for="bp">عدد الصفحات</label><input id="bp" type="number" min="0" inputmode="numeric">
@@ -264,12 +269,13 @@ function lib(){
  <label for="bkd">نوع القراءة</label><select id="bkd"><option value="full">قراءة كاملة</option><option value="explore">استكشاف: تصفّح وجرّب</option></select>
  <label for="bz">الحالة</label><select id="bz"><option value="want">بدي أقراه</option><option value="reading">عم أقراه</option><option value="done">خلصته</option></select>
  <button class="big" id="bsv">إضافة</button></details>
- ${grp('reading')}${exg('x')}${grp('want')}${grp('done')}${exg('d')}${B.length?'':'<p class="mut">ما في كتب لسا. ضيفي أول كتاب.</p>'}${exTable()}
+ ${lt==='full'?grp('reading')+grp('want')+grp('done')+(B.some(b=>b.kind!=='explore')?'':'<p class="mut">ما في كتب لسا. ضيفي أول كتاب.</p>'):exg('x')+exg('d')+(B.some(b=>b.kind==='explore')?'':'<p class="mut">ما في كتب استكشاف لسا. ضيفي واحد من "+ كتاب جديد" هون أو من الشاشة الرئيسية.</p>')+exTable()}
  <button class="big" id="bk">رجوع</button>`;
  osUI();$('bk').onclick=setup;
+ $('bkd').value=lt;
  $('bsv').onclick=()=>{const t=$('bt').value.trim();if(!t){$('bt').focus();return}const z=$('bz').value;
   const b={id:Date.now(),title:t,author:$('ba').value.trim(),total:+$('bp').value||0,subj:$('bj').value.trim(),status:z,read:0,mins:0,rating:0,notes:'',start:z==='want'?'':td(),end:z==='done'?td():'',kind:$('bkd').value,ex:$('bkd').value==='explore'?mkEx():null};
-  H.books.push(b);DB.save();pushBook(b);lib()};
+  H.books.push(b);lt=b.kind==='explore'?'explore':'full';DB.save();pushBook(b);lib()};
  app.onclick=bookClick;
 }
 function editBook(id){

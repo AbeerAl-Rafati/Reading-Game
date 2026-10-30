@@ -57,6 +57,7 @@ summary{cursor:pointer;color:var(--mut);margin-top:10px}
 .b2{position:relative;height:14px;background:var(--line);border-radius:8px}.b2 i{position:absolute;top:0;bottom:0;inset-inline-start:0;background:var(--acc);border-radius:8px}.b2 u{position:absolute;top:-3px;bottom:-3px;width:3px;background:var(--ink);border-radius:2px}
 .bd{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.bd span{border:2px solid var(--line);border-radius:20px;padding:4px 12px;font-size:.9rem;color:var(--mut);opacity:.55}.bd span.on{opacity:1;color:var(--ink);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 18%,transparent)}
 li{justify-content:space-between}li.g b{color:var(--ok)}li.b b{color:var(--bad)}
+#qm:empty{display:none}
 .ck{display:flex;gap:10px;align-items:center;margin:6px 0;font-weight:400}.ck input{width:20px;height:20px;accent-color:var(--acc)}
 .tb{width:100%;border-collapse:collapse;font-size:.85rem}.tb th,.tb td{border:1px solid var(--line);padding:6px 8px;text-align:center}.tb th{background:var(--card);color:var(--mut)}.tb td:first-child{text-align:start;min-width:90px}
 </style>
@@ -110,8 +111,7 @@ function setup(){
  app.innerHTML=`<h1>رحلة القراءة</h1>
  <p class="mut">قسّمي القراءة لمراحل قصيرة. بين كل مرحلة استراحة محترمة، وأي شي بدك تدوري عليه بتسجليه وبتدوري عليه بالاستراحة.</p>
  <div id="os"></div><div class="card" id="gm"></div>
- <h3>جلسة جديدة</h3><label for="bs">شو الكتاب؟</label><select id="bs"></select><div id="nbk"><input id="book" placeholder="اسم الكتاب" style="margin-top:8px"><input id="bpg" type="number" min="0" inputmode="numeric" placeholder="عدد صفحاته (اختياري)" style="margin-top:8px"><label class="ck" style="margin-top:8px"><input type="checkbox" id="bxp"> هاد كتاب استكشاف (تصفّح وجرّب)</label>
- <button class="ghost big" id="qa2" style="margin-top:8px">أضيفه لمكتبتي بس، بدون جلسة</button></div><p class="msg" id="qm"></p>
+ <h3>جلسة جديدة</h3><label for="bs">شو الكتاب؟</label><select id="bs"></select><div id="nbk"><input id="book" placeholder="اسم الكتاب" style="margin-top:8px"><input id="bpg" type="number" min="0" inputmode="numeric" placeholder="عدد صفحاته (اختياري)" style="margin-top:8px"><button class="ghost big" id="qa2" style="margin-top:8px">أضيفه لمكتبتي بس، بدون جلسة</button></div><p class="msg" id="qm"></p>
  <label for="n">كم مرحلة؟</label>
  <select id="n"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>6</option><option>8</option></select>
  <label for="m">كم دقيقة بالمرحلة؟</label>
@@ -124,10 +124,11 @@ function setup(){
  const bs=$('bs'),open=H.books.filter(b=>b.status!=='done').sort((a,b)=>(a.status==='reading'?0:1)-(b.status==='reading'?0:1));
  open.forEach(b=>{const o=document.createElement('option');o.value=b.id;o.textContent=(b.kind==='explore'?'🔎 ':'')+b.title;bs.append(o)});
  const o0=document.createElement('option');o0.value='0';o0.textContent='+ كتاب جديد (بينضاف لمكتبتي)';bs.append(o0);
+ const o1=document.createElement('option');o1.value='-1';o1.textContent='🔎 + كتاب استكشاف جديد';bs.append(o1);
  const sel=open.find(b=>b.id===H.sel)||open[0];bs.value=sel?sel.id:0;
- const tg=()=>{$('nbk').style.display=bs.value==='0'?'':'none';const xb=H.books.find(x=>String(x.id)===String(bs.value));if(xb&&xb.kind==='explore'){$('n').value='2';calc()}};bs.onchange=tg;tg();$('bxp').onchange=()=>{if($('bxp').checked){$('n').value='2';calc()}};
+ const tg=()=>{const v=String(bs.value);$('nbk').style.display=(v==='0'||v==='-1')?'':'none';const xb=H.books.find(x=>String(x.id)===v);if(v==='-1'||(xb&&xb.kind==='explore')){$('n').value='2';calc()}};bs.onchange=tg;tg();
  $('sb').onclick=stats;$('lb').onclick=lib;$('nt').onclick=notes;gmUI();osUI();$('qm').textContent=qmsg;qmsg='';
- $('qa2').onclick=()=>{const t=$('book').value.trim();if(!t){$('book').focus();return}const xp=$('bxp').checked;
+ $('qa2').onclick=()=>{const t=$('book').value.trim();if(!t){$('book').focus();return}const xp=String($('bs').value)==='-1';
   const b={id:Date.now(),title:t,author:'',total:+$('bpg').value||0,subj:'',status:'want',read:0,mins:0,rating:0,notes:'',start:'',end:'',kind:xp?'explore':'full',ex:xp?mkEx():null};
   H.books.push(b);DB.save();pushBook(b);qmsg='انضاف "'+t+'" لمكتبتي'+(xp?' بقسم الاستكشاف':'')+'.';setup()};
  if(sb){const b=document.createElement('button');b.className='ghost big';b.style.marginTop='10px';
@@ -136,7 +137,7 @@ function setup(){
   app.append(b)}
  $('st').onclick=()=>{
   const bid=+$('bs').value;let bb=H.books.find(x=>x.id===bid);
-  if(!bb){const t=$('book').value.trim(),xp=$('bxp').checked;if(!t){$('book').focus();return}bb={kind:xp?'explore':'full',ex:xp?mkEx():null,id:Date.now()+1,title:t,author:'',total:+$('bpg').value||0,subj:'',status:'reading',read:0,mins:0,rating:0,notes:'',start:dk(Date.now()),end:''};H.books.push(bb)}
+  if(!bb){const t=$('book').value.trim(),xp=String($('bs').value)==='-1';if(!t){$('book').focus();return}bb={kind:xp?'explore':'full',ex:xp?mkEx():null,id:Date.now()+1,title:t,author:'',total:+$('bpg').value||0,subj:'',status:'reading',read:0,mins:0,rating:0,notes:'',start:dk(Date.now()),end:''};H.books.push(bb)}
   S={book:bb.title,bid:bb.id,n:+$('n').value,m:+$('m').value,b:5,cur:1,pocket:[],pk:0,pages:0,dis:0,mins:0,id:Date.now(),done:0};OS.forEach(pauseS);OS.push(S);
   if(bb){H.sel=bb.id;bb.status='reading';if(!bb.start)bb.start=dk(Date.now());DB.save();pushBook(bb)}
   try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}
